@@ -43,6 +43,34 @@ By comparing the random results and the analytical frontier, you get a clearer p
 ## Installation
 
 1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/YourUsername/YourRepoName.git
-   cd YourRepoName
+```bash
+git clone https://github.com/JordiCorbilla/monte-carlo-portfolio-optimization.git
+cd monte-carlo-portfolio-optimization
+```
+
+## Usage
+
+You can directly run the script from the command line:
+
+```bash
+python monte_carlo_portfolio.py \
+    --assets AAPL MSFT TSLA \
+    --start 2020-01-01 \
+    --end 2025-01-01 \
+    --market SPY \
+    --risk_free_rate 0.05 \
+    --portfolios 100000
+```
+
+Command-Line Arguments:
+--assets: List of tickers (space-separated). If not specified, the script defaults to a set of Dividend Kings (source: DividendGrowthInvestor.com).
+--start: Start date for historical data (YYYY-MM-DD). Default: 2020-01-01.
+--end: End date for historical data (YYYY-MM-DD). Default: 2025-01-01.
+--market: Benchmark market ticker. Default: SPY.
+--risk_free_rate: Risk-free rate (annualized). Default: 0.05.
+--portfolios: Number of random portfolio simulations. Default: 100000.
+
+When the script finishes:
+
+- A PNG file named efficient_frontier_monter_carlo.png is saved locally.
+- A CSV file called market_data.csv is saved with the downloaded prices.
