@@ -74,3 +74,41 @@ When the script finishes:
 
 - A PNG file named efficient_frontier_monter_carlo.png is saved locally.
 - A CSV file called market_data.csv is saved with the downloaded prices.
+
+## File Structure
+```
+.
+├── monte_carlo_portfolio.py     # Main Python script (example name)
+├── portfolio_risk_kit.py        # Supporting code for plotting EF
+├── requirements.txt             # Dependencies list
+├── README.md                    # This file
+└── ...
+```
+
+- monte_carlo_portfolio.py: Primary script that handles data download, Monte Carlo simulation, efficient frontier plotting, and saves the results.
+- portfolio_risk_kit.py: Contains helper functions (plot_ef_ax, etc.) to handle the efficient frontier calculation.
+- requirements.txt: Python dependencies.
+- README.md: Documentation.
+
+
+## Configuration
+- Default Assets: By default, uses 10 dividend-paying stocks referred to as Dividend Kings from this list. You can override them by passing custom tickers via --assets.
+- Risk-Free Rate: Default set to 0.05 (5%). Adjust this to a realistic short-term interest rate if you prefer.
+- Trading Days: Set to 252, typical for US markets. Change if modeling a different market or a custom schedule.
+
+## Disclaimer
+- This project is for educational purposes only and is not financial advice.
+- Past performance does not guarantee future results. All investments carry risk, and you could lose money.
+
+## License
+- MIT License
+
+## Contributing
+- Fork this repository.
+- Create a new branch for your feature (git checkout -b feature/some-feature).
+- Commit your changes (git commit -m "Add some feature").
+- Push to your branch (git push origin feature/some-feature).
+- Open a Pull Request.
+- Contributions and suggestions are always welcome!
+
+Happy Investing!
