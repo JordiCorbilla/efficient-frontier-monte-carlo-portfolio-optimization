@@ -1,4 +1,4 @@
-# Monte Carlo Portfolio Optimization
+# Efficient Frontier - Monte Carlo Portfolio Optimization
 
 This repository demonstrates how to **simulate and optimize a portfolio** of assets using a **Monte Carlo** approach and a **mathematical Efficient Frontier** calculation. It identifies the portfolio with the highest Sharpe Ratio and compares its performance to a market benchmark (e.g., SPY).
 
