@@ -44,7 +44,7 @@ By comparing the random results and the analytical frontier, you get a clearer p
 
 1. **Clone the repository**:
 ```bash
-git clone https://github.com/JordiCorbilla/monte-carlo-portfolio-optimization.git
+git clone https://github.com/JordiCorbilla/efficient-frontier-monte-carlo-portfolio-optimization.git
 cd monte-carlo-portfolio-optimization
 ```
 
