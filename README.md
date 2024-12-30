@@ -79,14 +79,14 @@ When the script finishes:
 ```
 .
 ├── monte_carlo_portfolio.py     # Main Python script (example name)
-├── portfolio_risk_kit.py        # Supporting code for plotting EF
+├── riskoptima                   # Supporting code for plotting EF
 ├── requirements.txt             # Dependencies list
 ├── README.md                    # This file
 └── ...
 ```
 
 - monte_carlo_portfolio.py: Primary script that handles data download, Monte Carlo simulation, efficient frontier plotting, and saves the results.
-- portfolio_risk_kit.py: Contains helper functions (plot_ef_ax, etc.) to handle the efficient frontier calculation.
+- riskoptima.py: Contains helper functions (plot_ef_ax, etc.) to handle the efficient frontier calculation. (https://github.com/JordiCorbilla/RiskOptima)
 - requirements.txt: Python dependencies.
 - README.md: Documentation.
 
