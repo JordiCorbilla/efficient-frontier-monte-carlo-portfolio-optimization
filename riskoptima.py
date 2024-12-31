@@ -1,7 +1,8 @@
 """
 Author: Jordi Corbilla
+Version: 1.6.0
 
-Date: 26/12/2024
+Date: 31/12/2024
 
 This module provides various financial functions and tools for analyzing and handling portfolio data learned from EDHEC Business School, 
 computing statistical metrics, and optimizing portfolios based on different criteria. The main features include:
@@ -11,8 +12,12 @@ computing statistical metrics, and optimizing portfolios based on different crit
 - Efficient Frontier plotting
 - Value at Risk (VaR) and Conditional Value at Risk (CVaR) computations
 - Portfolio optimization based on different risk metrics
+- Mean Variance Optimization
+- Machine learning strategies
+- Black litterman adjusted returns
+- Market correlation and financial ratios
 
-Dependencies: pandas, numpy, scipy, statsmodels, yfinance, datetime
+Dependencies: pandas, numpy, scipy, statsmodels, yfinance, datetime, scikit-learn
 """
 
 
@@ -25,6 +30,12 @@ import yfinance as yf
 from scipy.stats import norm
 from scipy.optimize import minimize
 import datetime
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import StandardScaler
+from sklearn.impute import SimpleImputer
 
 class RiskOptima:
     TRADING_DAYS = 260
@@ -53,7 +64,7 @@ class RiskOptima:
         :param end_date: End date for data in 'YYYY-MM-DD' format.
         :return: A pandas DataFrame of adjusted close prices.
         """
-        data = yf.download(assets, start=start_date, end=end_date)
+        data = yf.download(assets, start=start_date, end=end_date, progress=False)
         return data['Close']
     
     @staticmethod
@@ -99,16 +110,13 @@ class RiskOptima:
             number of inds is 30 or 49
         """    
         if filetype == "returns":
-            name = f"{weighting}_rets"
             divisor = 100
         elif filetype == "nfirms":
-            name = "nfirms"
             divisor = 1
         elif filetype == "size":
-            name = "size"
             divisor = 1
         else:
-            raise ValueError(f"filetype must be one of: returns, nfirms, size")
+            raise ValueError("filetype must be one of: returns, nfirms, size")
     
         ind = pd.read_csv(file_path, header=0, index_col=0, na_values=-99.99) / divisor
         ind.index = pd.to_datetime(ind.index, format="%Y%m").to_period('M')
@@ -218,17 +226,54 @@ class RiskOptima:
         return returns.std() * (periods_per_year**0.5)
     
     
+    # @staticmethod
+    # def sharpe_ratio(returns, riskfree_rate, periods_per_year=12):
+    #     """
+    #     Computes the annualized Sharpe ratio of a set of returns
+    #     """
+    #     rf_per_period = (1 + riskfree_rate)**(1 / periods_per_year) - 1
+    #     excess_returns = returns - rf_per_period
+    #     ann_excess_returns = RiskOptima.annualize_returns(excess_returns, periods_per_year)
+    #     ann_volatility = RiskOptima.annualize_volatility(returns, periods_per_year)
+    #     return ann_excess_returns / ann_volatility
+    
+    # @staticmethod
+    # def sharpe_ratio(returns, risk_free_rate):
+    #     """
+    #     Calculate the Sharpe Ratio for a given set of investment returns.
+
+    #     :param returns: pandas Series or numpy array of investment returns.
+    #     :param float risk_free_rate: Annualized risk-free rate (e.g., yield on government bonds).
+    #     :return: float Sharpe Ratio.
+    #     """
+    #     trading_days = RiskOptima.get_trading_days()
+    #     excess_returns = returns - (risk_free_rate / trading_days)
+    #     annualized_excess_return = np.mean(excess_returns) * trading_days
+    #     annualized_std_dev = np.std(excess_returns) * np.sqrt(trading_days)
+    #     return annualized_excess_return / annualized_std_dev
+    
     @staticmethod
-    def sharpe_ratio(returns, riskfree_rate, periods_per_year):
+    def sharpe_ratio(returns, risk_free_rate, periods_per_year=None):
         """
-        Computes the annualized Sharpe ratio of a set of returns
+        Calculate the Sharpe Ratio for a given set of investment returns.
+    
+        :param returns: pandas Series or numpy array of investment returns.
+        :param float risk_free_rate: Annualized risk-free rate (e.g., yield on government bonds).
+        :param int periods_per_year: Number of periods per year (e.g., 12 for monthly, 252 for daily). 
+                                     Defaults to RiskOptima.get_trading_days() for daily data.
+        :return: float Sharpe Ratio.
         """
-        rf_per_period = (1 + riskfree_rate)**(1 / periods_per_year) - 1
+        if periods_per_year is None:
+            periods_per_year = RiskOptima.get_trading_days()
+    
+        rf_per_period = (1 + risk_free_rate)**(1 / periods_per_year) - 1
         excess_returns = returns - rf_per_period
+    
+        # Use helper methods for annualization
         ann_excess_returns = RiskOptima.annualize_returns(excess_returns, periods_per_year)
         ann_volatility = RiskOptima.annualize_volatility(returns, periods_per_year)
-        return ann_excess_returns / ann_volatility
     
+        return ann_excess_returns / ann_volatility
     
     @staticmethod
     def is_normal(returns, level=0.01):
@@ -544,7 +589,7 @@ class RiskOptima:
             "safe_returns": safe_returns,
             "drawdown": drawdown,
             "peak": peak_history,
-            "floor": floorval_history
+            "floorval_history": floorval_history
         }
         return backtest_result
     
@@ -865,7 +910,6 @@ class RiskOptima:
         """
         n_coupons = round(maturity*coupons_per_year)
         coupon_amt = principal*coupon_rate/coupons_per_year
-        coupons = np.repeat(coupon_amt, n_coupons)
         coupon_times = np.arange(1, n_coupons+1)
         cash_flows = pd.Series(data=coupon_amt, index=coupon_times)
         cash_flows.iloc[-1] += principal
@@ -1289,3 +1333,326 @@ class RiskOptima:
         elif today.weekday() == 6:    # Sunday
             today -= datetime.timedelta(days=2)
         return today.strftime('%Y-%m-%d')
+    
+    @staticmethod
+    def calculate_portfolio_allocation(investment_allocation):
+        """
+        Normalize portfolio allocations based on the investment amounts provided.
+    
+        :param dict investment_allocation: A dictionary mapping stock tickers to their investment amounts (e.g., {'AAPL': 1000, 'MSFT': 2000}).
+        :return: List of stock tickers and a numpy array of normalized weights.
+        """
+        total_investment = sum(investment_allocation.values())
+        normalized_weights = np.array([amount / total_investment for amount in investment_allocation.values()])
+        tickers = list(investment_allocation.keys())
+        return tickers, normalized_weights
+    
+    @staticmethod
+    def fetch_historical_stock_prices(tickers, start_date, end_date):
+        """
+        Retrieve historical stock price data for a list of tickers using Yahoo Finance.
+    
+        :param list tickers: List of stock ticker symbols.
+        :param str start_date: Start date for historical data in 'YYYY-MM-DD' format.
+        :param str end_date: End date for historical data in 'YYYY-MM-DD' format.
+        :return: pandas DataFrame containing the adjusted closing prices for the specified tickers.
+        """
+        stock_data = yf.download(tickers, start=start_date, end=end_date, progress=False)
+        return stock_data
+    
+    @staticmethod
+    def perform_mean_variance_optimization(tickers, start_date, end_date, max_acceptable_volatility, predefined_returns=None, min_allocation=0.01, max_allocation=0.35, num_simulations=100000):
+        """
+        Execute mean-variance optimization using Monte Carlo simulation with weight constraints.
+    
+        :param list tickers: List of stock ticker symbols to optimize.
+        :param str start_date: Start date for the historical data in 'YYYY-MM-DD' format.
+        :param str end_date: End date for the historical data in 'YYYY-MM-DD' format.
+        :param float max_acceptable_volatility: Maximum allowable annualized volatility for the portfolio.
+        :param ndarray predefined_returns: (Optional) Predefined annualized returns for the tickers.
+        :param float min_allocation: Minimum weight allocation for each stock.
+        :param float max_allocation: Maximum weight allocation for each stock.
+        :param int num_simulations: Number of Monte Carlo simulations to run.
+        :return: Optimal portfolio weights as a numpy array.
+        """
+        # Fetch historical stock price data
+        price_data = RiskOptima.fetch_historical_stock_prices(tickers, start_date, end_date)['Close']
+        if price_data.empty:
+            raise ValueError("No historical data retrieved. Verify the tickers and date range.")
+    
+        # Calculate daily returns
+        daily_returns = price_data.pct_change(fill_method=None).dropna()
+    
+        # Calculate expected annualized returns if not provided
+        if predefined_returns is None:
+            predefined_returns = daily_returns.mean() * RiskOptima.TRADING_DAYS
+    
+        # Compute the annualized covariance matrix
+        covariance_matrix = daily_returns.cov() * RiskOptima.TRADING_DAYS
+    
+        simulation_results = np.zeros((4, num_simulations))
+        weight_matrix = np.zeros((len(tickers), num_simulations))
+    
+        # Perform Monte Carlo simulations
+        for i in range(num_simulations):
+            random_weights = np.random.uniform(min_allocation, max_allocation, len(tickers))
+            random_weights /= np.sum(random_weights)
+    
+            weight_matrix[:, i] = random_weights
+    
+            portfolio_return = np.sum(random_weights * predefined_returns)
+            portfolio_volatility = np.sqrt(np.dot(random_weights.T, np.dot(covariance_matrix, random_weights)))
+            sharpe_ratio = portfolio_return / portfolio_volatility if portfolio_volatility > 0 else 0
+    
+            simulation_results[:, i] = [portfolio_return, portfolio_volatility, sharpe_ratio, i]
+    
+        result_columns = ['Annualized Return', 'Annualized Volatility', 'Sharpe Ratio', 'Simulation Index']
+        simulation_results_df = pd.DataFrame(simulation_results.T, columns=result_columns)
+    
+        feasible_portfolios = simulation_results_df[simulation_results_df['Annualized Volatility'] <= max_acceptable_volatility]
+    
+        if feasible_portfolios.empty:
+            raise ValueError("No portfolio satisfies the maximum volatility constraint.")
+    
+        optimal_index = feasible_portfolios['Sharpe Ratio'].idxmax()
+    
+        return weight_matrix[:, int(optimal_index)]
+  
+    @staticmethod
+    def add_features(stock_prices):
+        """
+        Add technical indicators like moving averages to the stock data.
+        :param stock_prices: DataFrame of stock prices.
+        :return: DataFrame with additional feature columns.
+        """
+        features = pd.DataFrame(stock_prices)
+        features['5_day_avg'] = stock_prices.rolling(window=5).mean()
+        features['10_day_avg'] = stock_prices.rolling(window=10).mean()
+        features['Close'] = stock_prices
+        return features
+    
+    
+    @staticmethod
+    def create_lagged_features(data, lag_days=5):
+        """
+        Create lagged features for machine learning models.
+        :param data: DataFrame containing the stock prices.
+        :param lag_days: Number of lag days to include.
+        :return: DataFrame with lagged features and target variable.
+        """
+        lagged_data = data.copy()
+        for lag in range(1, lag_days + 1):
+            lagged_data[f'lag_{lag}'] = lagged_data['Close'].shift(lag)
+        lagged_data.dropna(inplace=True)
+        return lagged_data
+    
+    @staticmethod
+    def evaluate_model(model, X, y):
+        """
+        Evaluate the model using cross-validation and calculate the average performance metrics.
+        :param model: The machine learning model to evaluate.
+        :param X: Feature matrix.
+        :param y: Target variable.
+        :return: Cross-validation score and mean squared error.
+        """
+        cv_scores = cross_val_score(model, X, y, cv=5, scoring='r2')
+        model.fit(X, y)
+        predictions = model.predict(X)
+        mse = mean_squared_error(y, predictions)
+        return np.mean(cv_scores), mse
+    
+    @staticmethod
+    def predict_with_model(model, feature_data):
+        """
+        Predict stock returns using the trained model.
+        :param model: Trained machine learning model.
+        :param feature_data: DataFrame of features for prediction.
+        :return: Predicted stock return.
+        """
+        scaler = StandardScaler()
+        feature_data_scaled = scaler.fit_transform(feature_data)
+        predictions = model.predict(feature_data_scaled)
+        return predictions[-1]  # Return the last prediction as the future return
+    
+    
+    @staticmethod
+    def generate_stock_predictions(ticker, start_date, end_date, model_type='Linear Regression'):
+        """
+        Generate stock return predictions and model confidence using a specified model type.
+        :param ticker: Stock ticker symbol.
+        :param start_date: Start date for the historical data (YYYY-MM-DD).
+        :param end_date: End date for the historical data (YYYY-MM-DD).
+        :param model_type: Choice of machine learning model ('Linear Regression', 'Random Forest', 'Gradient Boosting').
+        :return: Tuple of predicted return and model confidence.
+        """
+        # Fetch and preprocess stock data
+        stock_prices = RiskOptima.download_data_yfinance(ticker, start_date, end_date)
+        enriched_data = RiskOptima.add_features(stock_prices)
+        prepared_data = RiskOptima.create_lagged_features(enriched_data)
+    
+        # Separate features and target variable
+        X = prepared_data.drop('Close', axis=1)
+        y = prepared_data['Close']
+    
+        # Split data into training and testing sets
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+        # Impute missing values
+        imputer = SimpleImputer(strategy='mean')
+        X_train = imputer.fit_transform(X_train)
+        X_test = imputer.transform(X_test)
+    
+        # Select machine learning model
+        if model_type == 'Random Forest':
+            model = RandomForestRegressor(n_estimators=100, random_state=42)
+        elif model_type == 'Gradient Boosting':
+            model = GradientBoostingRegressor(n_estimators=100, random_state=42)
+        elif model_type == 'Linear Regression':
+            model = LinearRegression()
+        else:
+            raise ValueError("Invalid model type. Choose from 'Linear Regression', 'Random Forest', or 'Gradient Boosting'.")
+    
+        # Train and evaluate the model
+        avg_cv_score, mse = RiskOptima.evaluate_model(model, X_train, y_train)
+    
+        # Predict future returns
+        predicted_return = RiskOptima.predict_with_model(model, X_test)
+        
+        return predicted_return, avg_cv_score
+    
+    @staticmethod
+    def black_litterman_adjust_returns(market_returns, investor_views, view_confidences, historical_prices, tau=0.025):
+        """
+        Adjust market returns based on investor views and their confidences using the Black-Litterman model.
+    
+        :param dict market_returns: Expected market returns for each asset.
+        :param dict investor_views: Investor's views on the expected returns of assets.
+        :param dict view_confidences: Confidence levels for each investor view.
+        :param pandas.DataFrame historical_prices: Historical price data for calculating covariance matrix.
+        :param float tau: Market equilibrium uncertainty factor (default 0.025).
+        :return: Numpy array of adjusted returns for each asset.
+        """
+        num_assets = len(market_returns)
+    
+        # Create proportion matrix P and views vector Q
+        proportion_matrix = np.eye(num_assets)  # Identity matrix for simplicity
+        views_vector = np.array(list(investor_views.values())).reshape(-1, 1)
+    
+        # Compute the covariance matrix from historical prices
+        covariance_matrix = historical_prices['Close'].pct_change(fill_method=None).dropna().cov()
+    
+        # Compute Omega (diagonal matrix of view confidences)
+        omega_matrix = np.diag([tau / confidence for confidence in view_confidences.values()])
+    
+        # Apply the Black-Litterman formula
+        inv_tau_cov = np.linalg.inv(tau * covariance_matrix)
+        inv_omega = np.linalg.inv(omega_matrix)
+    
+        adjusted_returns = np.linalg.inv(inv_tau_cov + proportion_matrix.T @ inv_omega @ proportion_matrix)
+        adjusted_returns = adjusted_returns @ (
+            inv_tau_cov @ np.array(list(market_returns.values())).reshape(-1, 1) + proportion_matrix.T @ inv_omega @ views_vector
+        )
+    
+        return adjusted_returns.flatten()
+    
+    @staticmethod
+    def compute_market_returns(market_capitalizations, market_index_return):
+        """
+        Calculate market returns for individual assets based on market capitalizations and index return.
+    
+        :param dict market_capitalizations: Market capitalizations of assets.
+        :param float market_index_return: Return of the overall market index.
+        :return: Dictionary mapping tickers to their computed market returns.
+        """
+        total_market_cap = sum(market_capitalizations.values())
+        return {
+            ticker: (cap / total_market_cap) * market_index_return
+            for ticker, cap in market_capitalizations.items()
+        }
+    
+    @staticmethod
+    def sortino_ratio(returns, risk_free_rate):
+        """
+        Calculate the Sortino Ratio for a set of investment returns.
+
+        :param returns: pandas Series or numpy array of investment returns.
+        :param float risk_free_rate: Annualized risk-free rate (e.g., yield on government bonds).
+        :return: float Sortino Ratio.
+        """
+        trading_days = RiskOptima.get_trading_days()
+        excess_returns = returns - (risk_free_rate / trading_days)
+        downside_returns = np.minimum(excess_returns, 0)
+        annualized_excess_return = np.mean(excess_returns) * trading_days
+        annualized_downside_std_dev = np.std(downside_returns) * np.sqrt(trading_days)
+        return annualized_excess_return / annualized_downside_std_dev
+
+    # @staticmethod
+    # def information_ratio(returns, benchmark_returns):
+    #     """
+    #     Calculate the Information Ratio for a set of investment returns against a benchmark.
+
+    #     :param returns: pandas Series or numpy array of portfolio returns.
+    #     :param benchmark_returns: pandas Series or numpy array of benchmark returns.
+    #     :return: float Information Ratio.
+    #     """
+    #     trading_days = RiskOptima.get_trading_days()
+    #     active_returns = returns - benchmark_returns
+    #     annualized_active_return = np.mean(active_returns) * trading_days
+    #     tracking_error = np.std(active_returns) * np.sqrt(trading_days)
+    #     return annualized_active_return / tracking_error
+    
+    @staticmethod
+    def information_ratio(returns, benchmark_returns):
+        """
+        Calculate the Information Ratio for a set of investment returns against a benchmark.
+    
+        :param returns: pandas Series or numpy array of portfolio returns.
+        :param benchmark_returns: pandas Series or numpy array of benchmark returns.
+        :return: float Information Ratio.
+        """
+        # Ensure inputs are Series
+        if isinstance(returns, pd.DataFrame):
+            if returns.shape[1] > 1:
+                raise ValueError("`returns` must be a pandas Series or 1D numpy array, not a DataFrame with multiple columns.")
+            returns = returns.squeeze()
+    
+        if isinstance(benchmark_returns, pd.DataFrame):
+            if benchmark_returns.shape[1] > 1:
+                raise ValueError("`benchmark_returns` must be a pandas Series or 1D numpy array, not a DataFrame with multiple columns.")
+            benchmark_returns = benchmark_returns.squeeze()
+    
+        # Ensure alignment of indices
+        common_index = returns.index.intersection(benchmark_returns.index)
+        returns = returns.loc[common_index]
+        benchmark_returns = benchmark_returns.loc[common_index]
+    
+        trading_days = RiskOptima.get_trading_days()
+    
+        # Compute active returns and tracking error
+        active_returns = returns - benchmark_returns
+    
+        if np.allclose(active_returns, 0):  # If active returns are effectively zero
+            return 0.0  # Explicitly return 0 for identical returns
+    
+        annualized_active_return = np.mean(active_returns) * trading_days
+        tracking_error = np.std(active_returns) * np.sqrt(trading_days)
+    
+        if tracking_error == 0:  # Avoid division by zero
+            return 0.0
+    
+        # Return single statistic
+        return annualized_active_return / tracking_error
+
+    @staticmethod
+    def correlation_with_market(portfolio_returns, market_returns):
+        """
+        Calculate the correlation between portfolio returns and market index returns.
+
+        :param portfolio_returns: pandas Series of portfolio returns.
+        :param market_returns: pandas Series of market index returns.
+        :return: float Correlation coefficient.
+        """
+        common_dates = portfolio_returns.index.intersection(market_returns.index)
+        portfolio_aligned = portfolio_returns.loc[common_dates]
+        market_aligned = market_returns.loc[common_dates]
+        return portfolio_aligned.corr(market_aligned)

@@ -8,7 +8,7 @@ from riskoptima import RiskOptima
 """
  Author: Jordi Corbilla
 
- Date: 26/12/2024
+ Date: 31/12/2024
 
  Project Description:
    This project demonstrates how to optimize a portfolio through Monte Carlo simulation.
@@ -27,9 +27,15 @@ def plot_efficient_frontier(simulated_portfolios, weights_record, assets,
                             daily_returns, cov_matrix,
                             risk_free_rate=0.0, title='Efficient Frontier'):
     
+    #x_ticks = np.linspace(0, simulated_portfolios['Volatility'].max() * 1.1, 10)
+    #y_ticks = np.linspace(0, simulated_portfolios['Return'].max() * 1.1, 10)
+    
     fig, ax = plt.subplots(figsize=(17, 8))
     
     fig.subplots_adjust(right=0.95)
+
+    #ax.set_xticks(x_ticks)
+    #ax.set_yticks(y_ticks)
 
     ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: '{:.1f}%'.format(x * 100)))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: '{:.1f}%'.format(y * 100)))
@@ -79,6 +85,13 @@ def plot_efficient_frontier(simulated_portfolios, weights_record, assets,
         show_gmv=show_gmv,
         ax=ax
     )
+    
+    # Add major and minor grid lines
+    ax.grid(visible=True, which='major', linestyle='--', linewidth=0.5, color='gray', alpha=0.7)
+    ax.grid(visible=True, which='minor', linestyle=':', linewidth=0.4, color='lightgray', alpha=0.5)
+
+    # Ensure grid lines appear below data
+    ax.set_axisbelow(True)
 
     ax.scatter(
         optimal_portfolio['Volatility'], 
@@ -116,7 +129,7 @@ def plot_efficient_frontier(simulated_portfolios, weights_record, assets,
         f"- Sharpe Ratio: {optimal_portfolio['Sharpe Ratio']:.2f}"
     )
     ax.text(
-        1.19, 0.52,
+        1.19, 0.68,
         optimal_text,
         transform=ax.transAxes,
         fontsize=10,
@@ -126,14 +139,14 @@ def plot_efficient_frontier(simulated_portfolios, weights_record, assets,
     )
 
     market_text = (
-        f"US Market (benchmark S&P 500)\n"
+        f"Market (benchmark S&P 500)\n"
         f"- Return: {market_return*100:.2f}%\n"
         f"- Volatility: {market_volatility*100:.2f}%\n"
         f"- Risk Free Rate: {risk_free_rate*100:.2f}%\n"
         f"- Sharpe Ratio: {market_sharpe:.2f}"
     )
     ax.text(
-        1.19, 0.35,
+        1.19, 0.52,
         market_text,
         transform=ax.transAxes,
         fontsize=10,
