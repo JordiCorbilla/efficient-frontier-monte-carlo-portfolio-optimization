@@ -1,14 +1,11 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
 import argparse
-from datetime import datetime
 from riskoptima import RiskOptima
 
 """
  Author: Jordi Corbilla
 
- Date: 31/12/2024
+ Date: 05/01/2024
 
  Project Description:
    This project demonstrates how to optimize a portfolio through Monte Carlo simulation.
@@ -22,147 +19,8 @@ from riskoptima import RiskOptima
    chosen benchmark.
 """
 
-def plot_efficient_frontier(simulated_portfolios, weights_record, assets, 
-                            market_return, market_volatility, market_sharpe, 
-                            daily_returns, cov_matrix,
-                            risk_free_rate=0.0, title='Efficient Frontier'):
-    
-    #x_ticks = np.linspace(0, simulated_portfolios['Volatility'].max() * 1.1, 10)
-    #y_ticks = np.linspace(0, simulated_portfolios['Return'].max() * 1.1, 10)
-    
-    fig, ax = plt.subplots(figsize=(17, 8))
-    
-    fig.subplots_adjust(right=0.95)
-
-    #ax.set_xticks(x_ticks)
-    #ax.set_yticks(y_ticks)
-
-    ax.xaxis.set_major_formatter(FuncFormatter(lambda x, _: '{:.1f}%'.format(x * 100)))
-    ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: '{:.1f}%'.format(y * 100)))
-
-    sc = ax.scatter(
-        simulated_portfolios['Volatility'], 
-        simulated_portfolios['Return'], 
-        c=simulated_portfolios['Sharpe Ratio'], 
-        cmap='plasma', 
-        alpha=0.5,
-        label='Simulated Portfolios'
-    )
-
-    fig.colorbar(sc, ax=ax, label='Sharpe Ratio')
-
-    ax.set_xlabel('Volatility')
-    ax.set_ylabel('Return')
-    ax.set_title(title)
-
-    ax.scatter(
-        market_volatility, market_return,
-        color='red', marker='o', s=100,
-        label='Market (benchmark S&P 500)'
-    )
-
-    optimal_idx = simulated_portfolios['Sharpe Ratio'].idxmax()
-    optimal_portfolio = simulated_portfolios.loc[optimal_idx]
-    optimal_weights = weights_record[:, optimal_idx]
-
-    annual_returns = daily_returns.mean() * RiskOptima.get_trading_days()
-    annual_cov = daily_returns.cov() * RiskOptima.get_trading_days()
-    
-    n_points = 50
-    show_cml = True
-    show_ew = True
-    show_gmv = True
-    
-    RiskOptima.plot_ef_ax(
-        n_points=n_points,
-        expected_returns=annual_returns,
-        cov=annual_cov,
-        style='.-',
-        legend=False,
-        show_cml=show_cml,
-        riskfree_rate=risk_free_rate,
-        show_ew=show_ew,
-        show_gmv=show_gmv,
-        ax=ax
-    )
-    
-    # Add major and minor grid lines
-    ax.grid(visible=True, which='major', linestyle='--', linewidth=0.5, color='gray', alpha=0.7)
-    ax.grid(visible=True, which='minor', linestyle=':', linewidth=0.4, color='lightgray', alpha=0.5)
-
-    # Ensure grid lines appear below data
-    ax.set_axisbelow(True)
-
-    ax.scatter(
-        optimal_portfolio['Volatility'], 
-        optimal_portfolio['Return'],
-        color='green', marker='*', s=200,
-        label='Optimal Portfolio'
-    )
-
-    ax.legend(
-        loc='upper center',
-        bbox_to_anchor=(0.5, -0.08),
-        fancybox=True,
-        shadow=True,
-        ncol=3
-    )
-
-    weight_text = (
-        "Optimal Portfolio Weights:\n" +
-        "\n".join([f"-{asset}: {weight*100:.2f}%" for asset, weight in zip(assets, optimal_weights)])
-    )
-    ax.text(
-        1.19, 1.0,
-        weight_text,
-        transform=ax.transAxes,
-        fontsize=10,
-        verticalalignment='top',
-        bbox=dict(boxstyle="round,pad=0.3", edgecolor='green', facecolor='white'),
-        ha='left'
-    )
-
-    optimal_text = (
-        f"Optimized Portfolio\n"
-        f"- Return: {optimal_portfolio['Return']*100:.2f}%\n"
-        f"- Volatility: {optimal_portfolio['Volatility']*100:.2f}%\n"
-        f"- Sharpe Ratio: {optimal_portfolio['Sharpe Ratio']:.2f}"
-    )
-    ax.text(
-        1.19, 0.68,
-        optimal_text,
-        transform=ax.transAxes,
-        fontsize=10,
-        verticalalignment='top',
-        bbox=dict(boxstyle="round,pad=0.3", edgecolor='green', facecolor='white'),
-        ha='left'
-    )
-
-    market_text = (
-        f"Market (benchmark S&P 500)\n"
-        f"- Return: {market_return*100:.2f}%\n"
-        f"- Volatility: {market_volatility*100:.2f}%\n"
-        f"- Risk Free Rate: {risk_free_rate*100:.2f}%\n"
-        f"- Sharpe Ratio: {market_sharpe:.2f}"
-    )
-    ax.text(
-        1.19, 0.52,
-        market_text,
-        transform=ax.transAxes,
-        fontsize=10,
-        verticalalignment='top',
-        bbox=dict(boxstyle="round,pad=0.3", edgecolor='green', facecolor='white'),
-        ha='left'
-    )
-
-    plt.tight_layout()
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    plt.savefig(f"efficient_frontier_monter_carlo_{timestamp}.png", dpi=300, bbox_inches='tight')
-    plt.show()
-
-
 def main(assets=None, start_date='2020-01-01', end_date='2023-01-01',
-         market='SPY', risk_free_rate=0.0, num_portfolios=100_000):
+         market='SPY', risk_free_rate=0.05, num_portfolios=100_000):
     """
     Main function to run the portfolio optimization using Monte Carlo simulation.
 
@@ -190,8 +48,35 @@ def main(assets=None, start_date='2020-01-01', end_date='2023-01-01',
     market_return, market_volatility, market_sharpe = RiskOptima.get_market_statistics(
         market, start_date, end_date, risk_free_rate
     )
+    
+    # example of randomly assigning weights to the current portfolio
+    my_current_weights = np.array([
+        0.04, 
+        0.14, 
+        0.01, 
+        0.01, 
+        0.09, 
+        0.16, 
+        0.06, 
+        0.28, 
+        0.16, 
+        0.05
+    ])
+    
+    my_current_labels = np.array([
+        'Altria Group Inc.', 
+        'Northwest Natural Gas', 
+        'Black Hills Corp.', 
+        'Con Edison', 
+        'PepsiCo Inc.', 
+        'National Fuel Gas', 
+        'Coca-Cola Company', 
+        'Federal Realty Inv. Trust', 
+        'Genuine Parts Co.', 
+        'Middlesex Water Co.'
+    ])
 
-    plot_efficient_frontier(
+    RiskOptima.plot_efficient_frontier(
         simulated_portfolios,
         weights_record,
         assets,
@@ -200,7 +85,14 @@ def main(assets=None, start_date='2020-01-01', end_date='2023-01-01',
         market_sharpe,
         daily_returns, cov_matrix,
         risk_free_rate=risk_free_rate,
-        title='Efficient Frontier - Monte Carlo Simulation'
+        title=f'Efficient Frontier - Monte Carlo Simulation {start_date} to {end_date}',
+        current_weights=my_current_weights,
+        current_labels=my_current_labels,
+        start_date=start_date,
+        end_date=end_date,
+        set_ticks=False,
+        x_pos_table=1.20,
+        y_pos_table=0.56
     )
 
 
@@ -208,7 +100,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Monte Carlo Portfolio Optimization')
     parser.add_argument('--assets', nargs='+', default=None,
                         help='List of assets to include in the portfolio')
-    parser.add_argument('--start', type=str, default='2020-01-01',
+    parser.add_argument('--start', type=str, default='2024-01-01',
                         help='Start date for historical data (YYYY-MM-DD)')
     parser.add_argument('--end', type=str, default=RiskOptima.get_previous_working_day(),
                         help='End date for historical data (YYYY-MM-DD)')
