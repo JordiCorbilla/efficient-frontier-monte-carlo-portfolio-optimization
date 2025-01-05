@@ -25,7 +25,7 @@ This project leverages **Modern Portfolio Theory** and **Monte Carlo Simulation*
 
 By comparing the random results and the analytical frontier, you get a clearer picture of your portfolio’s potential risk and return.
 
-![](https://github.com/JordiCorbilla/monte-carlo-portfolio-optimization/raw/main/efficient_frontier_monter_carlo_20250105_165657.png)
+![](https://github.com/JordiCorbilla/monte-carlo-portfolio-optimization/raw/main/efficient_frontier_monter_carlo_20250105_202614.png)
 
 ---
 
