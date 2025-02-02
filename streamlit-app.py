@@ -27,8 +27,6 @@ default_assets = [
 
 st.subheader("Asset Details")
 asset_df = st.data_editor(pd.DataFrame(default_assets), num_rows="dynamic", key="asset_editor")
-st.write("Current asset table:")
-st.dataframe(asset_df)
 
 st.sidebar.header("Optimisation Parameters")
 start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2024-01-01"))
