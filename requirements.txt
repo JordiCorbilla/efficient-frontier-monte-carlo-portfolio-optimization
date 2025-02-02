@@ -3,4 +3,4 @@ matplotlib
 pandas
 numpy
 yfinance
-riskoptima
+riskoptima==1.13.0

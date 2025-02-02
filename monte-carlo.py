@@ -1,11 +1,11 @@
-import numpy as np
 import argparse
+import pandas as pd
 from riskoptima import RiskOptima
 
 """
  Author: Jordi Corbilla
 
- Date: 05/01/2024
+ Date: 02/02/2025
 
  Project Description:
    This project demonstrates how to optimize a portfolio through Monte Carlo simulation.
@@ -19,92 +19,66 @@ from riskoptima import RiskOptima
    chosen benchmark.
 """
 
-def main(assets=None, start_date='2020-01-01', end_date='2023-01-01',
-         market='SPY', risk_free_rate=0.05, num_portfolios=100_000):
+def main(assets, weights, labels,
+         start_date='2020-01-01', end_date='2023-01-01',
+         market_benchmark='SPY', risk_free_rate=0.05, num_portfolios=100_000):
     """
     Main function to run the portfolio optimization using Monte Carlo simulation.
 
-    :param assets: List of asset tickers.
-    :param start_date: Start date for data collection (string).
-    :param end_date: End date for data collection (string).
-    :param market: Market ticker for benchmarking (string).
-    :param risk_free_rate: Risk-free rate to use in Sharpe ratio.
-    :param num_portfolios: Number of portfolios to simulate in Monte Carlo.
+    :param assets: Comma-separated asset tickers.
+    :param weights: Comma-separated asset weights.
+    :param labels: Comma-separated asset labels.
+    :param start_date: Start date for historical data (YYYY-MM-DD).
+    :param end_date: End date for historical data (YYYY-MM-DD).
+    :param market_benchmark: Market ticker for benchmarking.
+    :param risk_free_rate: Risk-free rate for Sharpe ratio calculation.
+    :param num_portfolios: Number of random portfolios to simulate.
     """
-    if assets is None:
-        assets = ['MO', 'NWN', 'BKH', 'ED', 'PEP', 'NFG', 'KO', 'FRT', 'GPC', 'MSEX']
+    # Convert string arguments into lists
+    if isinstance(assets, str):
+        assets = [x.strip() for x in assets.split(",")]
+    if isinstance(weights, str):
+        weights = [float(x.strip()) for x in weights.split(",")]
+    if isinstance(labels, str):
+        labels = [x.strip() for x in labels.split(",")]
 
-    asset_data = RiskOptima.download_data_yfinance(assets, start_date, end_date)
-    asset_data.to_csv('market_data.csv')
+    # Create the asset table DataFrame
+    asset_table = pd.DataFrame(list(zip(assets, weights, labels)), columns=['Asset', 'Weight', 'Label'])
 
-    daily_returns, cov_matrix = RiskOptima.calculate_statistics(asset_data, risk_free_rate)
-
-    simulated_portfolios, weights_record = RiskOptima.run_monte_carlo_simulation(
-        daily_returns, cov_matrix, 
-        num_portfolios=num_portfolios, 
-        risk_free_rate=risk_free_rate
-    )
-
-    market_return, market_volatility, market_sharpe = RiskOptima.get_market_statistics(
-        market, start_date, end_date, risk_free_rate
-    )
-    
-    # example of randomly assigning weights to the current portfolio
-    my_current_weights = np.array([
-        0.04, 
-        0.14, 
-        0.01, 
-        0.01, 
-        0.09, 
-        0.16, 
-        0.06, 
-        0.28, 
-        0.16, 
-        0.05
-    ])
-    
-    my_current_labels = np.array([
-        'Altria Group Inc.', 
-        'Northwest Natural Gas', 
-        'Black Hills Corp.', 
-        'Con Edison', 
-        'PepsiCo Inc.', 
-        'National Fuel Gas', 
-        'Coca-Cola Company', 
-        'Federal Realty Inv. Trust', 
-        'Genuine Parts Co.', 
-        'Middlesex Water Co.'
-    ])
-
-    RiskOptima.plot_efficient_frontier(
-        simulated_portfolios,
-        weights_record,
-        assets,
-        market_return,
-        market_volatility,
-        market_sharpe,
-        daily_returns, cov_matrix,
-        risk_free_rate=risk_free_rate,
-        title=f'Efficient Frontier - Monte Carlo Simulation {start_date} to {end_date}',
-        current_weights=my_current_weights,
-        current_labels=my_current_labels,
+    # Call the new RiskOptima function with the asset table and other parameters
+    RiskOptima.plot_efficient_frontier_monte_carlo(
+        asset_table,
         start_date=start_date,
         end_date=end_date,
+        risk_free_rate=risk_free_rate,
+        num_portfolios=num_portfolios,
+        market_benchmark=market_benchmark,
         set_ticks=False,
-        x_pos_table=1.20,
-        y_pos_table=0.56
+        x_pos_table=1.15,    # Position for the weight table on the plot
+        y_pos_table=0.52,    # Position for the weight table on the plot
+        title=f'Efficient Frontier - Monte Carlo Simulation {start_date} to {end_date}'
     )
 
-
 if __name__ == "__main__":
+    # Define default data as comma-separated strings.
+    default_assets = "MO,NWN,BKH,ED,PEP,NFG,KO,FRT,GPC,MSEX"
+    default_weights = "0.04,0.14,0.01,0.01,0.09,0.16,0.06,0.28,0.16,0.05"
+    default_labels = ("Altria Group Inc.,Northwest Natural Gas,Black Hills Corp.,Con Edison,"
+                      "PepsiCo Inc.,National Fuel Gas,Coca-Cola Company,Federal Realty Inv. Trust,"
+                      "Genuine Parts Co.,Middlesex Water Co.")
+
     parser = argparse.ArgumentParser(description='Monte Carlo Portfolio Optimization')
-    parser.add_argument('--assets', nargs='+', default=None,
-                        help='List of assets to include in the portfolio')
+    parser.add_argument('--assets', type=str, default=default_assets,
+                        help='Comma-separated list of asset tickers')
+    parser.add_argument('--weights', type=str, default=default_weights,
+                        help='Comma-separated list of asset weights')
+    parser.add_argument('--labels', type=str, default=default_labels,
+                        help='Comma-separated list of asset labels (company names)')
     parser.add_argument('--start', type=str, default='2024-01-01',
                         help='Start date for historical data (YYYY-MM-DD)')
     parser.add_argument('--end', type=str, default=RiskOptima.get_previous_working_day(),
                         help='End date for historical data (YYYY-MM-DD)')
-    parser.add_argument('--market', type=str, default='SPY',
+    parser.add_argument('--market_benchmark', type=str, default='SPY',
                         help='Market ticker for benchmarking')
     parser.add_argument('--risk_free_rate', type=float, default=0.05,
                         help='Risk-free rate for Sharpe ratio calculation')
@@ -115,9 +89,11 @@ if __name__ == "__main__":
 
     main(
         assets=args.assets,
+        weights=args.weights,
+        labels=args.labels,
         start_date=args.start,
         end_date=args.end,
-        market=args.market,
+        market_benchmark=args.market_benchmark,
         risk_free_rate=args.risk_free_rate,
         num_portfolios=args.portfolios
     )
