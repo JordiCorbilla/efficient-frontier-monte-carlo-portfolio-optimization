@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from riskoptima import RiskOptima
 
 st.set_page_config(page_title="Portfolio Optimisation", layout="wide")
-st.title("Portfolio Optimisation with an Interactive Asset Grid")
+st.title("Portfolio Optimisation with Monte Carlo Simulations and the efficient frontier")
 
 default_assets = [
     {"Asset": "MO",    "Weight": 0.04, "Label": "Altria Group Inc."},
@@ -25,13 +25,16 @@ default_assets = [
     {"Asset": "MSEX",  "Weight": 0.05, "Label": "Middlesex Water Co."}
 ]
 
-st.subheader("Asset Details")
+st.subheader("Asset Details: Modify to use your own portfolio")
 asset_df = st.data_editor(pd.DataFrame(default_assets), num_rows="dynamic", key="asset_editor")
 
 st.sidebar.header("Optimisation Parameters")
 start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2024-01-01"))
-default_end = str(RiskOptima.get_previous_working_day())
-end_date = st.sidebar.text_input("End Date (YYYY-MM-DD)", value=default_end)
+default_end_str = RiskOptima.get_previous_working_day()  # e.g. "2025-02-01"
+default_end_date = pd.to_datetime(default_end_str).date()
+
+end_date = st.sidebar.date_input("End Date", value=default_end_date)
+
 market_benchmark = st.sidebar.text_input("Market Benchmark Ticker", value="SPY")
 risk_free_rate = st.sidebar.number_input("Risk Free Rate", value=0.05, step=0.01, format="%.2f")
 num_portfolios = st.sidebar.number_input("Number of Simulations", value=10000, step=1000)
