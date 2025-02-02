@@ -4,101 +4,56 @@ Created on Sun Feb  2 13:51:54 2025
 
 @author: jordi
 """
-
 import streamlit as st
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-import riskoptima as RiskOptima
+from riskoptima import RiskOptima
 
-st.set_page_config(page_title="Monte Carlo Portfolio Optimisation", layout="wide")
-st.title("Monte Carlo Portfolio Optimisation with RiskOptima")
+st.set_page_config(page_title="Portfolio Optimisation", layout="wide")
+st.title("Portfolio Optimisation with an Interactive Asset Grid")
 
+default_assets = [
+    {"Asset": "MO",    "Weight": 0.04, "Label": "Altria Group Inc."},
+    {"Asset": "NWN",   "Weight": 0.14, "Label": "Northwest Natural Gas"},
+    {"Asset": "BKH",   "Weight": 0.01, "Label": "Black Hills Corp."},
+    {"Asset": "ED",    "Weight": 0.01, "Label": "Con Edison"},
+    {"Asset": "PEP",   "Weight": 0.09, "Label": "PepsiCo Inc."},
+    {"Asset": "NFG",   "Weight": 0.16, "Label": "National Fuel Gas"},
+    {"Asset": "KO",    "Weight": 0.06, "Label": "Coca-Cola Company"},
+    {"Asset": "FRT",   "Weight": 0.28, "Label": "Federal Realty Inv. Trust"},
+    {"Asset": "GPC",   "Weight": 0.16, "Label": "Genuine Parts Co."},
+    {"Asset": "MSEX",  "Weight": 0.05, "Label": "Middlesex Water Co."}
+]
 
-st.sidebar.header("Input Parameters")
+st.subheader("Asset Details")
+asset_df = st.data_editor(pd.DataFrame(default_assets), num_rows="dynamic", key="asset_editor")
+st.write("Current asset table:")
+st.dataframe(asset_df)
 
-assets_str = st.sidebar.text_input(
-    "Enter asset tickers (comma separated)",
-    value="APPL,TSLA"
-)
+st.sidebar.header("Optimisation Parameters")
+start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2024-01-01"))
+default_end = str(RiskOptima.get_previous_working_day())
+end_date = st.sidebar.text_input("End Date (YYYY-MM-DD)", value=default_end)
+market_benchmark = st.sidebar.text_input("Market Benchmark Ticker", value="SPY")
+risk_free_rate = st.sidebar.number_input("Risk Free Rate", value=0.05, step=0.01, format="%.2f")
+num_portfolios = st.sidebar.number_input("Number of Simulations", value=10000, step=1000)
 
-start_date = st.sidebar.date_input("Start Date", value=pd.to_datetime("2020-01-01"))
-end_date = st.sidebar.date_input("End Date", value=pd.to_datetime("2023-01-01"))
-market = st.sidebar.text_input("Market Ticker for Benchmarking", value="SPY")
-risk_free_rate = st.sidebar.number_input("Risk-Free Rate", value=0.05, step=0.01, format="%.2f")
-num_portfolios = st.sidebar.number_input("Number of Portfolios to Simulate", value=100000, step=1000)
-
-use_custom_portfolio = st.sidebar.checkbox("Use custom current portfolio?", value=False)
-if use_custom_portfolio:
-    current_weights_str = st.sidebar.text_input(
-        "Current Portfolio Weights (comma separated)",
-        value="0.5,0.5"
-    )
-    current_labels_str = st.sidebar.text_input(
-        "Current Portfolio Labels (comma separated)",
-        value="Apple,Tesla"
-    )
-
-run_button = st.sidebar.button("Run Optimisation")
-
-
-if run_button:
-    # Parse the asset tickers from the input string
-    assets = [asset.strip() for asset in assets_str.split(",") if asset.strip() != ""]
+if st.sidebar.button("Run Optimisation"):
+    st.write("### Running Monte Carlo Simulation...")
     start_date_str = start_date.strftime("%Y-%m-%d")
-    end_date_str = end_date.strftime("%Y-%m-%d")
     
-    # Parse custom portfolio inputs if provided
-    if use_custom_portfolio:
-        try:
-            current_weights = [float(x.strip()) for x in current_weights_str.split(",") if x.strip() != ""]
-            current_labels = [label.strip() for label in current_labels_str.split(",") if label.strip() != ""]
-            if len(current_weights) != len(assets) or len(current_labels) != len(assets):
-                st.warning("The number of custom weights or labels does not match the number of assets. Ignoring custom portfolio inputs.")
-                current_weights = None
-                current_labels = None
-        except Exception as e:
-            st.error("Error parsing custom portfolio inputs. Please ensure weights are numeric and labels are valid.")
-            current_weights = None
-            current_labels = None
-    else:
-        current_weights = None
-        current_labels = None
-
-    st.write("Running Monte Carlo simulation...")
-    with st.spinner("Fetching data and running simulation..."):
-        # Download asset data via yfinance
-        asset_data = RiskOptima.download_data_yfinance(assets, start_date_str, end_date_str)
-        # Compute daily returns and covariance matrix
-        daily_returns, cov_matrix = RiskOptima.calculate_statistics(asset_data, risk_free_rate)
-        # Run the Monte Carlo simulation
-        simulated_portfolios, weights_record = RiskOptima.run_monte_carlo_simulation(
-            daily_returns, cov_matrix, num_portfolios=num_portfolios, risk_free_rate=risk_free_rate
-        )
-        # Get market statistics for benchmarking
-        market_return, market_volatility, market_sharpe = RiskOptima.get_market_statistics(
-            market, start_date_str, end_date_str, risk_free_rate
-        )
-        
-        # Plot the efficient frontier using RiskOptima
-        plt.figure()  # Create a new figure
-        RiskOptima.plot_efficient_frontier(
-            simulated_portfolios,
-            weights_record,
-            assets,
-            market_return,
-            market_volatility,
-            market_sharpe,
-            daily_returns,
-            cov_matrix,
-            risk_free_rate=risk_free_rate,
-            title=f'Efficient Frontier - Monte Carlo Simulation {start_date_str} to {end_date_str}',
-            current_weights=current_weights,
-            current_labels=current_labels,
-            start_date=start_date_str,
-            end_date=end_date_str,
-            set_ticks=False
-        )
-        st.pyplot(plt.gcf())
-        plt.clf()
-    st.success("Optimisation complete.")
+    RiskOptima.plot_efficient_frontier_monte_carlo(
+        asset_df,
+        start_date=start_date_str,
+        end_date=end_date,
+        risk_free_rate=risk_free_rate,
+        num_portfolios=num_portfolios,
+        market_benchmark=market_benchmark,
+        set_ticks=False,
+        x_pos_table=1.15,  # Position for the weight table on the plot
+        y_pos_table=0.52,  # Position for the weight table on the plot
+        title=f'Efficient Frontier - Monte Carlo Simulation {start_date_str} to {end_date}'
+    )
+    
+    st.pyplot(plt.gcf())
+    plt.clf()
