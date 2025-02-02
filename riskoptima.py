@@ -1946,6 +1946,9 @@ class RiskOptima:
             ]
         ]
         
+        for spine in ax.spines.values():
+            spine.set_edgecolor('black')
+        
         # Convert to DataFrame
         stats_df = RiskOptima.consolidate_stats_to_dataframe(titles, stats_lists)
 
@@ -2057,4 +2060,55 @@ class RiskOptima:
         )
         ax.add_patch(rect)
         
+        for spine in ax.spines.values():
+            spine.set_edgecolor('black')
+        
         return ax, plt, colors
+    
+    @staticmethod
+    def generate_predictions_tickers(tickers, start_date, end_date, model_type):
+        predicted_return = {}
+        model_confidence = {}
+        for ticker in tickers:
+            predicted_return[ticker], model_confidence[ticker] = RiskOptima.generate_stock_predictions(
+                ticker, start_date, end_date, model_type=model_type
+            )
+        return predicted_return, model_confidence
+    
+    @staticmethod
+    def calculate_performance_metrics(portfolio_returns, market_returns, risk_free_rate, final_returns, is_market_return=False):
+        if  is_market_return:
+            return [
+                f"Sharpe Ratio: {RiskOptima.sharpe_ratio(portfolio_returns, risk_free_rate).iloc[0]:.2f}",
+                f"Sortino Ratio: {RiskOptima.sortino_ratio(portfolio_returns, risk_free_rate).iloc[0]:.2f}",
+                f"Info Ratio: {RiskOptima.information_ratio(portfolio_returns, market_returns):.2f}",
+                f"Return: {final_returns:.2f}%"
+                ]
+        return [
+            f"Sharpe Ratio: {RiskOptima.sharpe_ratio(portfolio_returns, risk_free_rate):.2f}",
+            f"Sortino Ratio: {RiskOptima.sortino_ratio(portfolio_returns, risk_free_rate):.2f}",
+            f"Info Ratio: {RiskOptima.information_ratio(portfolio_returns, market_returns):.2f}",
+            f"Return: {final_returns:.2f}%"
+        ]
+    
+    @staticmethod
+    def plot_performance_metrics(model_type, portfolio_returns_unoptimized, portfolio_returns_mv, portfolio_returns_ml_mv, 
+                                 market_returns, risk_free_rate, final_returns_unoptimized, final_returns_mv, final_returns_ml_mv, 
+                                 final_returns_market, ax, column_colors):
+        titles = [
+            "Unoptimized\nPortfolio",
+            "Mean-Variance\nOptimized Portfolio",
+            f"{model_type} & Mean-Variance\nOptimized Portfolio",
+            "Benchmark\n(S&P 500)"
+        ]
+        
+        stats_lists = [
+            RiskOptima.calculate_performance_metrics(portfolio_returns_unoptimized, market_returns, risk_free_rate, final_returns_unoptimized),  
+            RiskOptima.calculate_performance_metrics(portfolio_returns_mv, market_returns, risk_free_rate, final_returns_mv),
+            RiskOptima.calculate_performance_metrics(portfolio_returns_ml_mv, market_returns, risk_free_rate, final_returns_ml_mv),
+            RiskOptima.calculate_performance_metrics(market_returns, market_returns, risk_free_rate, final_returns_market, True)
+        ]
+        
+        stats_df = RiskOptima.consolidate_stats_to_dataframe(titles, stats_lists)
+        
+        RiskOptima.add_table_to_plot(ax, stats_df, None, column_colors, x=1.02, y=0.30)    
